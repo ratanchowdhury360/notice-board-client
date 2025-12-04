@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* Custom input placeholder and text colors */
+input::placeholder,
+textarea::placeholder {
+    color: #9ca3af; /* gray-400 */
+    opacity: 1;
+}
+
+input[type="text"],
+input[type="date"],
+input[type="email"],
+input[type="password"],
+textarea,
+select {
+    color: #1f2937; /* gray-800 */
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+    color: #111827; /* gray-900 */
+}
+
+select option {
+    color: #1f2937; /* gray-800 */
+}
+
+select option:first-child {
+    color: #9ca3af; /* gray-400 for placeholder option */
+}
+
