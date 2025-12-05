@@ -32,7 +32,13 @@ const NoticeBoard = () => {
         fetch(`${API_BASE_URL}/notice`)
             .then(res => res.json())
             .then(data => {
-                setNotices(data);
+                // Sort notices by date/time - most recent first
+                const sortedNotices = data.sort((a, b) => {
+                    const dateA = new Date(a.publishDate || a.publishedOn || a.createdAt || 0);
+                    const dateB = new Date(b.publishDate || b.publishedOn || b.createdAt || 0);
+                    return dateB - dateA; // Most recent first
+                });
+                setNotices(sortedNotices);
             });
     };
 
@@ -185,6 +191,16 @@ const NoticeBoard = () => {
     };
 
     const handleToggleStatus = (noticeId, currentStatus, currentIsPublished) => {
+        // Find the notice - handle both id and _id
+        const notice = notices.find(n => (n.id === noticeId) || (n._id === noticeId));
+        if (!notice) {
+            console.error('Notice not found:', noticeId);
+            return;
+        }
+
+        // Use the correct ID format (prefer id, fallback to _id)
+        const idToUse = notice.id || notice._id || noticeId;
+        
         let newStatus = currentStatus;
         let newIsPublished = !currentIsPublished;
 
@@ -201,13 +217,13 @@ const NoticeBoard = () => {
         }
 
         const updatedNotice = {
-            ...notices.find(n => n.id === noticeId),
+            ...notice,
             status: newStatus,
             isPublished: newIsPublished
         };
 
         // send data to the server
-        fetch(`${API_BASE_URL}/notice/${noticeId}`, {
+        fetch(`${API_BASE_URL}/notice/${idToUse}`, {
             method: 'PUT',
             headers: {
                 'content-type': 'application/json'
@@ -216,13 +232,15 @@ const NoticeBoard = () => {
         })
             .then(res => res.json())
             .then(data => {
-                if (data.message) {
-                    // Update local state
-                    const updatedNotices = notices.map(notice => 
-                        notice.id === noticeId ? updatedNotice : notice
-                    );
-                    setNotices(updatedNotices);
+                if (data.message || data.modifiedCount || data.acknowledged) {
+                    // Refresh notices from server to get updated data
+                    fetchNotices();
+                } else {
+                    console.error('Failed to update notice:', data);
                 }
+            })
+            .catch(err => {
+                console.error('Error updating notice:', err);
             });
     };
 
@@ -326,15 +344,15 @@ const NoticeBoard = () => {
     };
 
     return (
-        <div className="p-6 bg-white h-full">
-            <div className="flex items-center justify-between">
+        <div className="p-3 sm:p-6 bg-white h-full">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
                 <div>
                     {/* Title */}
-                    <h1 className="text-3xl font-bold mb-4 text-gray-800">Notice Management</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold mb-3 sm:mb-4 text-gray-800">Notice Management</h1>
 
                     {/* Summary */}
-                    <div className="mb-6">
-                        <span className="text-green-600 font-semibold mr-4">Active Notices: {activeNotices}</span>
+                    <div className="mb-6 flex flex-col sm:flex-row gap-2 sm:gap-4 text-sm sm:text-base">
+                        <span className="text-green-600 font-semibold">Active Notices: {activeNotices}</span>
                         <span className="text-orange-600 font-semibold">Draft Notice: {String(draftNotices).padStart(2, '0')}</span>
                     </div>
 
@@ -342,12 +360,12 @@ const NoticeBoard = () => {
                 </div>
                 <div>
                     {/* Action Buttons */}
-                    <div className="flex gap-4 mb-6">
-                        <Link to="/notice-board/create" className="btn bg-orange-500 hover:bg-orange-600 text-white border-0 shadow-md">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6">
+                        <Link to="/notice-board/create" className="btn bg-orange-500 hover:bg-orange-600 text-white border-0 shadow-md btn-sm sm:btn-md">
                             + Create Notice
                         </Link>
-                        <button className="btn bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 shadow-sm">
-                            <span className="mr-2">✏️</span> All Draft Notice
+                        <button className="btn bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 shadow-sm btn-sm sm:btn-md">
+                            <span className="mr-2">✏️</span> <span className="hidden sm:inline">All Draft Notice</span><span className="sm:hidden">Draft</span>
                         </button>
                     </div>
                 </div>
@@ -355,82 +373,84 @@ const NoticeBoard = () => {
 
 
             {/* Filters */}
-            <div className="bg-gray-50 p-4 flex justify-between rounded-lg mb-6 border border-gray-200">
-                <div className="flex flex-wrap j gap-4 items-end">
-                    <div>
-                        <label className="block text-sm font-medium mb-1 text-gray-700">Filter by:</label>
-                        <select
-                            className="select select-bordered w-48 bg-white border-gray-300 focus:border-blue-500 focus:outline-none text-gray-800 placeholder-gray-400"
-                            value={filters.department}
-                            onChange={(e) => handleFilterChange('department', e.target.value)}
+            <div className="bg-gray-50 p-3 sm:p-4 rounded-lg mb-6 border border-gray-200">
+                <div className="flex flex-col gap-3 sm:gap-4">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">Filter by:</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 items-end">
+                        <div>
+                            <select
+                                className="select select-bordered w-full bg-white border-gray-300 focus:border-blue-500 focus:outline-none text-gray-800 placeholder-gray-400 text-sm"
+                                value={filters.department}
+                                onChange={(e) => handleFilterChange('department', e.target.value)}
+                            >
+                                <option value="" className="text-gray-400">Departments or individuals</option>
+                                <option value="all">All Department</option>
+                                <option value="finance">Finance</option>
+                                <option value="hr">HR</option>
+                                <option value="sales team">Sales Team</option>
+                                <option value="web team">Web Team</option>
+                                <option value="database team">Database Team</option>
+                                <option value="admin">Admin</option>
+                                <option value="it">IT</option>
+                                <option value="individual">Individual</option>
+                            </select>
+                        </div>
+                        <div>
+                            <input
+                                type="text"
+                                placeholder="Employee Id or Name"
+                                className="input input-bordered w-full bg-white border-gray-300 focus:border-blue-500 focus:outline-none text-gray-800 placeholder:text-gray-400 text-sm"
+                                value={filters.employeeId}
+                                onChange={(e) => handleFilterChange('employeeId', e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <select
+                                className="select select-bordered w-full bg-white border-gray-300 focus:border-blue-500 focus:outline-none text-gray-800 text-sm"
+                                value={filters.status}
+                                onChange={(e) => handleFilterChange('status', e.target.value)}
+                            >
+                                <option value="" className="text-gray-400">Status</option>
+                                <option value="Published">Published</option>
+                                <option value="Draft">Draft</option>
+                                <option value="Unpublished">Unpublished</option>
+                            </select>
+                        </div>
+                        <div>
+                            <input
+                                type="date"
+                                className="input input-bordered w-full bg-white border-gray-300 focus:border-blue-500 text-gray-800 placeholder:text-gray-400 text-sm
+                                [&::-webkit-calendar-picker-indicator]:invert
+                                [&::-webkit-calendar-picker-indicator]:opacity-60
+                                hover:[&::-webkit-calendar-picker-indicator]:opacity-100"
+                                value={filters.publishedOn}
+                                onChange={(e) => handleFilterChange('publishedOn', e.target.value)}
+                            />
+                        </div>
+                        <button
+                            onClick={resetFilters}
+                            className="btn bg-blue-600 hover:bg-blue-700 text-white border-0 btn-sm shadow-sm w-full"
                         >
-                            <option value="" className="text-gray-400">Departments or individuals</option>
-                            <option value="all">All Department</option>
-                            <option value="finance">Finance</option>
-                            <option value="hr">HR</option>
-                            <option value="sales team">Sales Team</option>
-                            <option value="web team">Web Team</option>
-                            <option value="database team">Database Team</option>
-                            <option value="admin">Admin</option>
-                            <option value="it">IT</option>
-                            <option value="individual">Individual</option>
-                        </select>
+                            Reset
+                        </button>
                     </div>
-                    <div>
-                        <input
-                            type="text"
-                            placeholder="Employee Id or Name"
-                            className="input input-bordered w-48 bg-white border-gray-300 focus:border-blue-500 focus:outline-none text-gray-800 placeholder:text-gray-400"
-                            value={filters.employeeId}
-                            onChange={(e) => handleFilterChange('employeeId', e.target.value)}
-                        />
-                    </div>
-                    <div>
-                        <select
-                            className="select select-bordered w-32 bg-white border-gray-300 focus:border-blue-500 focus:outline-none text-gray-800"
-                            value={filters.status}
-                            onChange={(e) => handleFilterChange('status', e.target.value)}
-                        >
-                            <option value="" className="text-gray-400">Status</option>
-                            <option value="Published">Published</option>
-                            <option value="Draft">Draft</option>
-                            <option value="Unpublished">Unpublished</option>
-                        </select>
-                    </div>
-                    <div>
-                        <input
-                            type="date"
-                            className="input input-bordered w-40 bg-white border-gray-300 focus:border-blue-500 text-gray-800 placeholder:text-gray-400
-                            [&::-webkit-calendar-picker-indicator]:invert
-                            [&::-webkit-calendar-picker-indicator]:opacity-60
-                            hover:[&::-webkit-calendar-picker-indicator]:opacity-100"
-                            value={filters.publishedOn}
-                            onChange={(e) => handleFilterChange('publishedOn', e.target.value)}
-                        />
-                    </div>
-                    <button
-                        onClick={resetFilters}
-                        className="btn bg-blue-600 hover:bg-blue-700 text-white border-0 btn-sm shadow-sm h-10"
-                    >
-                        Reset Filters
-                    </button>
                 </div>
             </div>
 
             {/* Table */}
             <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                <table className="table w-full">
+                <table className="table w-full text-xs sm:text-sm">
                     <thead>
                         <tr className="bg-gray-50 border-b border-gray-200">
-                            <th className="text-gray-700 font-semibold py-3">
-                                <input type="checkbox" className="checkbox checkbox-primary  checkbox-sm" />
+                            <th className="text-gray-700 font-semibold py-2 sm:py-3 px-1 sm:px-3">
+                                <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" />
                             </th>
-                            <th className="text-gray-700 font-semibold py-3">Title</th>
-                            <th className="text-gray-700 font-semibold py-3">Notice Type</th>
-                            <th className="text-gray-700 font-semibold py-3">Departments/Individual</th>
-                            <th className="text-gray-700 font-semibold py-3">Published On</th>
-                            <th className="text-gray-700 font-semibold py-3">Status</th>
-                            <th className="text-gray-700 font-semibold py-3">Actions</th>
+                            <th className="text-gray-700 font-semibold py-2 sm:py-3 px-1 sm:px-3">Title</th>
+                            <th className="text-gray-700 font-semibold py-2 sm:py-3 px-1 sm:px-3 hidden sm:table-cell">Type</th>
+                            <th className="text-gray-700 font-semibold py-2 sm:py-3 px-1 sm:px-3 hidden md:table-cell">Dept/Ind</th>
+                            <th className="text-gray-700 font-semibold py-2 sm:py-3 px-1 sm:px-3 hidden lg:table-cell">Published</th>
+                            <th className="text-gray-700 font-semibold py-2 sm:py-3 px-1 sm:px-3">Status</th>
+                            <th className="text-gray-700 font-semibold py-2 sm:py-3 px-1 sm:px-3">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -441,8 +461,22 @@ const NoticeBoard = () => {
                                 </td>
                             </tr>
                         ) : (
-                            currentNotices.map((notice) => (
-                                <tr key={notice.id || notice._id} className="hover:bg-gray-50 border-b border-gray-100">
+                            currentNotices.map((notice) => {
+                                const noticeId = notice.id || notice._id;
+                                const isDraft = notice.status === 'Draft';
+                                
+                                return (
+                                <tr 
+                                    key={noticeId} 
+                                    className="hover:bg-gray-50 border-b border-gray-100"
+                                    onClick={(e) => {
+                                        // If Draft, make row clickable to edit (but not if clicking on buttons/inputs)
+                                        if (isDraft && !e.target.closest('button') && !e.target.closest('input') && !e.target.closest('a')) {
+                                            handleEditNotice(notice);
+                                        }
+                                    }}
+                                    style={isDraft ? { cursor: 'pointer' } : {}}
+                                >
                                     <td className="py-3">
                                         <input type="checkbox" className="checkbox checkbox-primary checkbox-sm" />
                                     </td>
@@ -459,7 +493,16 @@ const NoticeBoard = () => {
                                     <td className="text-gray-700 py-3">{formatDate(notice.publishDate || notice.publishedOn)}</td>
                                     <td className="py-3">
                                         <div className="flex items-center gap-2">
-                                            <span className={`${getStatusBadgeClass(notice.status)} px-3 py-1 rounded-full text-xs font-medium`}>
+                                            <span 
+                                                className={`${getStatusBadgeClass(notice.status)} px-3 py-1 rounded-full text-xs font-medium ${isDraft ? 'cursor-pointer hover:opacity-80' : ''}`}
+                                                onClick={(e) => {
+                                                    if (isDraft) {
+                                                        e.stopPropagation();
+                                                        handleEditNotice(notice);
+                                                    }
+                                                }}
+                                                title={isDraft ? 'Click to edit draft' : ''}
+                                            >
                                                 {notice.status}
                                             </span>
                                             <input
@@ -470,25 +513,30 @@ const NoticeBoard = () => {
                                                         : 'bg-gray-300'
                                                 }`}
                                                 checked={notice.isPublished || false}
-                                                onChange={() => handleToggleStatus(notice.id, notice.status, notice.isPublished)}
+                                                onChange={(e) => {
+                                                    e.stopPropagation();
+                                                    handleToggleStatus(noticeId, notice.status, notice.isPublished);
+                                                }}
                                             />
                                         </div>
                                     </td>
                                     
                                     <td className="py-3">
                                         <div className="flex gap-2 items-center">
-                                            <button 
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    handleViewNotice(notice);
-                                                }}
-                                                className="btn btn-sm btn-ghost hover:bg-blue-100 text-blue-600 hover:text-blue-800 border-0 h-9 w-9 p-0 flex items-center justify-center cursor-pointer"
-                                                title="View Details"
-                                            >
-                                                <span className="text-lg" role="img" aria-label="View">👁️</span>
-                                            </button>
+                                            {!isDraft && (
+                                                <button 
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        handleViewNotice(notice);
+                                                    }}
+                                                    className="btn btn-sm btn-ghost hover:bg-blue-100 text-blue-600 hover:text-blue-800 border-0 h-9 w-9 p-0 flex items-center justify-center cursor-pointer"
+                                                    title="View Details"
+                                                >
+                                                    <span className="text-lg" role="img" aria-label="View">👁️</span>
+                                                </button>
+                                            )}
                                             <button 
                                                 type="button"
                                                 onClick={(e) => {
@@ -497,7 +545,7 @@ const NoticeBoard = () => {
                                                     handleEditNotice(notice);
                                                 }}
                                                 className="btn btn-sm btn-ghost hover:bg-green-100 text-green-600 hover:text-green-800 border-0 h-9 w-9 p-0 flex items-center justify-center cursor-pointer"
-                                                title="Edit Notice"
+                                                title={isDraft ? "Edit & Publish Draft" : "Edit Notice"}
                                             >
                                                 <span className="text-lg" role="img" aria-label="Edit">✏️</span>
                                             </button>
@@ -506,7 +554,7 @@ const NoticeBoard = () => {
                                                 onClick={(e) => {
                                                     e.preventDefault();
                                                     e.stopPropagation();
-                                                    handleDeleteNotice(notice.id);
+                                                    handleDeleteNotice(noticeId);
                                                 }}
                                                 className="btn btn-sm btn-ghost hover:bg-red-100 text-red-600 hover:text-red-800 border-0 h-9 w-9 p-0 flex items-center justify-center cursor-pointer"
                                                 title="Delete Notice"
@@ -516,7 +564,8 @@ const NoticeBoard = () => {
                                         </div>
                                     </td>
                                 </tr>
-                            ))
+                                );
+                            })
                         )}
                     </tbody>
                 </table>

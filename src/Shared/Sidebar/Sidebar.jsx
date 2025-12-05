@@ -41,15 +41,14 @@ const Sidebar = () => {
         { name: 'Document manager', path: '/document-manager', icon: '📁' },
         { name: 'Notice Board', path: '/notice-board', icon: '📢' },
         { name: 'Activity Log', path: '/activity-log', icon: '📝' },
-        { name: 'Exit Interview', path: '/exit-interview', icon: '🚪' },
         { name: 'Profile', path: '/profile', icon: '👤' }
     ];
 
     return (
-        <div className="bg-gray-100 h-screen p-4">
+        <div className="bg-gray-100 h-screen p-3 sm:p-4 overflow-y-auto">
             {/* Logo */}
-            <div className="mb-6 pt-4">
-                <h2 className="text-xl font-bold text-gray-800">Nebs-IT</h2>
+            <div className="mb-6 pt-2 sm:pt-4">
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800">Nebs-IT</h2>
             </div>
 
             {/* Menu Items */}

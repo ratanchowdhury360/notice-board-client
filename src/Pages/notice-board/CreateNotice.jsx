@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
+import Swal from 'sweetalert2';
 
 const API_BASE_URL = 'http://localhost:3000';
 
 const CreateNotice = () => {
     const navigate = useNavigate();
-    const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [filePreviewUrls, setFilePreviewUrls] = useState({});
     const [formData, setFormData] = useState({
         targetType: 'Individual',
@@ -53,14 +53,22 @@ const CreateNotice = () => {
         const newUrls = {};
         files.forEach(file => {
             if (file instanceof File) {
-                newUrls[file.name + file.size] = URL.createObjectURL(file);
+                const key = file.name + file.size;
+                newUrls[key] = URL.createObjectURL(file);
             }
         });
-        setFilePreviewUrls(prev => ({ ...prev, ...newUrls }));
+        // Update file preview URLs first
+        setFilePreviewUrls(prev => {
+            const updated = { ...prev, ...newUrls };
+            return updated;
+        });
+        // Then update attachments
         setFormData(prev => ({
             ...prev,
             attachments: [...prev.attachments, ...files]
         }));
+        // Clear the input so same file can be selected again
+        e.target.value = '';
     };
 
     const removeFile = (index) => {
@@ -100,6 +108,7 @@ const CreateNotice = () => {
         if (typeof file === 'string') return null;
         if (file instanceof File) {
             const key = file.name + file.size;
+            // Return URL from state if available
             return filePreviewUrls[key] || null;
         }
         return null;
@@ -108,13 +117,43 @@ const CreateNotice = () => {
     const handleSubmit = (e, action) => {
         e.preventDefault();
 
+        // Validate required fields
+        if (!formData.targetType) {
+            alert('Please select Target Department(s) or Individual');
+            return;
+        }
+
+        if (!formData.noticeType) {
+            alert('Please select Notice Type');
+            return;
+        }
+
+        // If Individual, validate required fields
+        if (formData.targetType === 'Individual') {
+            if (!formData.employeeId || formData.employeeId.trim() === '') {
+                alert('Please enter Employee ID');
+                return;
+            }
+            if (!formData.position) {
+                alert('Please select Position');
+                return;
+            }
+        }
+
+        // If Department, validate departments are selected
+        if (formData.targetType === 'Department' && formData.departments.length === 0) {
+            alert('Please select at least one Department');
+            return;
+        }
+
         if (action === 'draft') {
             // Save as draft
             const draftData = {
                 ...formData,
                 status: 'Draft',
                 isPublished: false,
-                id: Date.now()
+                id: Date.now(),
+                lastUpdated: new Date().toISOString()
             };
 
             // save this notice data to the database (via server)
@@ -128,9 +167,37 @@ const CreateNotice = () => {
                 .then(res => res.json())
                 .then(data => {
                     if (data.insertedId || data.message) {
-                        alert('Draft saved successfully');
-                        navigate('/notice-board');
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Draft Saved Successfully!',
+                            text: 'Your notice has been saved as a draft.',
+                            confirmButtonColor: '#3b82f6',
+                            confirmButtonText: 'OK',
+                            customClass: {
+                                popup: 'rounded-lg shadow-xl',
+                                title: 'text-gray-800 font-bold text-xl',
+                                htmlContainer: 'text-gray-600 text-base',
+                                confirmButton: 'px-6 py-2 rounded-lg font-medium'
+                            },
+                            buttonsStyling: false
+                        }).then(() => {
+                            navigate('/notice-board');
+                        });
                     }
+                })
+                .catch(() => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Failed to save draft. Please try again.',
+                        confirmButtonColor: '#ef4444',
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            popup: 'rounded-lg shadow-xl',
+                            title: 'text-gray-800 font-bold text-xl',
+                            htmlContainer: 'text-gray-600 text-base'
+                        }
+                    });
                 });
         } else if (action === 'publish') {
             // Publish notice
@@ -140,6 +207,7 @@ const CreateNotice = () => {
                 isPublished: true,
                 id: Date.now(),
                 publishedOn: formData.publishDate || new Date().toISOString().split('T')[0],
+                lastUpdated: new Date().toISOString(),
                 department: formData.targetType === 'Department' 
                     ? (formData.departments.length > 0 ? formData.departments.join(', ') : 'All Department')
                     : 'Individual',
@@ -157,16 +225,82 @@ const CreateNotice = () => {
                 .then(res => res.json())
                 .then(data => {
                     if (data.insertedId || data.message) {
-                        setShowSuccessModal(true);
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Notice Published Successfully!',
+                            html: `
+                                <div style="text-align: center;">
+                                    <p style="color: #4b5563; font-size: 16px; margin-bottom: 8px;">
+                                        Your notice <strong style="color: #1f2937;">"${formData.noticeTitle || 'Untitled Notice'}"</strong> has been published
+                                    </p>
+                                    <p style="color: #6b7280; font-size: 14px; margin-top: 8px;">
+                                        It is now visible to all selected departments.
+                                    </p>
+                                </div>
+                            `,
+                            showCancelButton: true,
+                            showDenyButton: true,
+                            confirmButtonText: 'View Notice',
+                            denyButtonText: 'Create Another',
+                            cancelButtonText: 'Close',
+                            confirmButtonColor: '#3b82f6',
+                            denyButtonColor: '#f97316',
+                            cancelButtonColor: '#6b7280',
+                            customClass: {
+                                popup: 'rounded-lg shadow-2xl border border-gray-200',
+                                title: 'text-gray-800 font-bold text-2xl mb-4',
+                                htmlContainer: 'text-left',
+                                confirmButton: 'px-6 py-2 rounded-lg font-medium mr-2',
+                                denyButton: 'px-6 py-2 rounded-lg font-medium mr-2',
+                                cancelButton: 'px-6 py-2 rounded-lg font-medium'
+                            },
+                            buttonsStyling: false,
+                            width: '500px'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                navigate('/notice-board');
+                            } else if (result.isDenied) {
+                                // Reset form and stay on page
+                                setFormData({
+                                    targetType: 'Individual',
+                                    noticeTitle: '',
+                                    employeeId: '',
+                                    employeeName: '',
+                                    position: '',
+                                    departments: [],
+                                    noticeType: '',
+                                    publishDate: '',
+                                    noticeBody: '',
+                                    attachments: []
+                                });
+                                // Clear file preview URLs
+                                Object.values(filePreviewUrls).forEach(url => {
+                                    URL.revokeObjectURL(url);
+                                });
+                                setFilePreviewUrls({});
+                            } else {
+                                navigate('/notice-board');
+                            }
+                        });
                     }
+                })
+                .catch(() => {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Publication Failed',
+                        text: 'Failed to publish notice. Please try again.',
+                        confirmButtonColor: '#ef4444',
+                        confirmButtonText: 'OK',
+                        customClass: {
+                            popup: 'rounded-lg shadow-xl',
+                            title: 'text-gray-800 font-bold text-xl',
+                            htmlContainer: 'text-gray-600 text-base'
+                        }
+                    });
                 });
         }
     };
 
-    const handleCloseModal = () => {
-        setShowSuccessModal(false);
-        navigate('/notice-board');
-    };
 
     // Cleanup object URLs to prevent memory leaks
     useEffect(() => {
@@ -252,15 +386,14 @@ const CreateNotice = () => {
                 {/* Notice Title */}
                 <div className="mb-6">
                     <label className="label">
-                        <span className="label-text text-gray-800 font-semibold">Notice Title <span className="text-red-500">*</span></span>
+                        <span className="label-text text-gray-800 font-semibold">Notice Title</span>
                     </label>
                     <input
                         type="text"
-                        placeholder="Write the Title of Notice"
+                        placeholder="Write the Title of Notice (optional)"
                         className="input input-bordered w-full text-gray-800 placeholder:text-gray-400 bg-white border-gray-300 focus:border-blue-500"
                         value={formData.noticeTitle}
                         onChange={(e) => handleInputChange('noticeTitle', e.target.value)}
-                        required
                     />
                 </div>
 
@@ -270,30 +403,55 @@ const CreateNotice = () => {
                         <div className="grid grid-cols-3 gap-4 mb-6">
                             <div>
                                 <label className="label">
-                                    <span className="label-text text-gray-800 font-semibold">Select Employee ID <span className="text-red-500">*</span></span>
+                                    <span className="label-text text-gray-800 font-semibold">Employee ID <span className="text-red-500">*</span></span>
                                 </label>
-                                <select
-                                    className="select select-bordered w-full text-gray-800 bg-white border-gray-300 focus:border-blue-500"
-                                    value={formData.employeeId}
-                                    onChange={(e) => handleInputChange('employeeId', e.target.value)}
-                                    required
-                                >
-                                    <option value="" className="text-gray-400">Select employee designation</option>
-                                    <option value="EMP001">EMP001</option>
-                                    <option value="EMP002">EMP002</option>
-                                </select>
+                                <div className="space-y-2">
+                                    <select
+                                        id="employee-id-select"
+                                        className="select select-bordered w-full text-gray-800 bg-white border-gray-300 focus:border-blue-500"
+                                        value={formData.employeeId && ['EMP001', 'EMP002'].includes(formData.employeeId) ? formData.employeeId : ''}
+                                        onChange={(e) => {
+                                            handleInputChange('employeeId', e.target.value);
+                                        }}
+                                    >
+                                        <option value="" className="text-gray-400">Select from list</option>
+                                        <option value="EMP001">EMP001</option>
+                                        <option value="EMP002">EMP002</option>
+                                    </select>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 h-px bg-gray-300"></div>
+                                        <span className="text-xs text-gray-500 px-2">OR</span>
+                                        <div className="flex-1 h-px bg-gray-300"></div>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        id="employee-id-input"
+                                        placeholder="Type Employee ID manually"
+                                        className="input input-bordered w-full text-gray-800 placeholder:text-gray-400 bg-white border-gray-300 focus:border-blue-500"
+                                        value={formData.employeeId}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+                                            handleInputChange('employeeId', value);
+                                            // Clear select if typing manually (not a dropdown value)
+                                            if (value && !['EMP001', 'EMP002'].includes(value)) {
+                                                const select = document.getElementById('employee-id-select');
+                                                if (select) select.value = '';
+                                            }
+                                        }}
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Select from dropdown or type manually</p>
                             </div>
                             <div>
                                 <label className="label">
-                                    <span className="label-text text-gray-800 font-semibold">Employee Name <span className="text-red-500">*</span></span>
+                                    <span className="label-text text-gray-800 font-semibold">Employee Name</span>
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="Enter employee full name"
+                                    placeholder="Enter employee full name (optional)"
                                     className="input input-bordered w-full text-gray-800 placeholder:text-gray-400 bg-white border-gray-300 focus:border-blue-500"
                                     value={formData.employeeName}
                                     onChange={(e) => handleInputChange('employeeName', e.target.value)}
-                                    required
                                 />
                             </div>
                             <div>
@@ -336,15 +494,14 @@ const CreateNotice = () => {
                     </div>
                     <div>
                         <label className="label">
-                            <span className="label-text text-gray-800 font-semibold">Publish Date <span className="text-red-500">*</span></span>
+                            <span className="label-text text-gray-800 font-semibold">Publish Date</span>
                         </label>
                         <input
                             type="date"
                             className="input input-bordered w-full text-gray-800 bg-white border-gray-300 focus:border-blue-500"
-                            placeholder="Select Publishing Date"
+                            placeholder="Select Publishing Date (optional)"
                             value={formData.publishDate}
                             onChange={(e) => handleInputChange('publishDate', e.target.value)}
-                            required
                         />
                     </div>
                 </div>
@@ -392,18 +549,28 @@ const CreateNotice = () => {
 
                                 return (
                                     <div key={index} className="border border-gray-300 rounded-lg p-4 bg-white">
-                                        {isImage && previewUrl ? (
+                                        {isImage ? (
                                             <div className="space-y-2">
                                                 <div className="relative">
-                                                    <img 
-                                                        src={previewUrl} 
-                                                        alt={fileName}
-                                                        className="max-w-full h-auto max-h-64 rounded-lg border border-gray-200"
-                                                    />
+                                                    {previewUrl ? (
+                                                        <img 
+                                                            src={previewUrl} 
+                                                            alt={fileName}
+                                                            className="max-w-full h-auto max-h-64 rounded-lg border border-gray-200"
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                                const errorDiv = e.target.nextSibling;
+                                                                if (errorDiv) errorDiv.style.display = 'block';
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    <div style={{ display: 'none' }} className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+                                                        <span className="text-gray-500">Image not available</span>
+                                                    </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => removeFile(index)}
-                                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 shadow-lg"
+                                                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-red-600 shadow-lg z-10"
                                                         title="Remove file"
                                                     >
                                                         ×
@@ -504,57 +671,6 @@ const CreateNotice = () => {
                     </button>
                 </div>
             </form>
-
-            {/* Success Modal */}
-            {showSuccessModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-                        <div className="text-center">
-                            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <span className="text-white text-4xl">✓</span>
-                            </div>
-                            <h2 className="text-2xl font-bold mb-4">Notice Published Successfully</h2>
-                            <p className="text-gray-600 mb-6">
-                                Your notice "{formData.noticeTitle || 'Holiday Schedule - November 2025'}" has been published and is now visible to all selected departments.
-                            </p>
-                            <div className="flex gap-4 justify-center">
-                                <button
-                                    onClick={() => navigate('/notice-board')}
-                                    className="btn btn-outline btn-primary"
-                                >
-                                    View Notice
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowSuccessModal(false);
-                                        setFormData({
-                                            targetType: 'Individual',
-                                            noticeTitle: '',
-                                            employeeId: '',
-                                            employeeName: '',
-                                            position: '',
-                                            departments: [],
-                                            noticeType: '',
-                                            publishDate: '',
-                                            noticeBody: '',
-                                            attachments: []
-                                        });
-                                    }}
-                                    className="btn btn-outline btn-warning"
-                                >
-                                    + Create Another
-                                </button>
-                                <button
-                                    onClick={handleCloseModal}
-                                    className="btn btn-outline"
-                                >
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

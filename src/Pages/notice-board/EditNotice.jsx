@@ -204,7 +204,8 @@ const EditNotice = () => {
                 id: parseInt(id),
                 status: 'Draft',
                 isPublished: false,
-                publishedOn: formData.publishDate || new Date().toISOString().split('T')[0],
+                publishedOn: new Date().toISOString().split('T')[0],
+                lastUpdated: new Date().toISOString(),
                 department: formData.targetType === 'Department' 
                     ? (formData.departments.length > 0 ? formData.departments.join(', ') : 'All Department')
                     : 'Individual',
@@ -237,7 +238,8 @@ const EditNotice = () => {
                 id: parseInt(id),
                 status: 'Published',
                 isPublished: true,
-                publishedOn: formData.publishDate || new Date().toISOString().split('T')[0],
+                publishedOn: new Date().toISOString().split('T')[0],
+                lastUpdated: new Date().toISOString(),
                 department: formData.targetType === 'Department' 
                     ? (formData.departments.length > 0 ? formData.departments.join(', ') : 'All Department')
                     : 'Individual',
@@ -631,7 +633,7 @@ const EditNotice = () => {
                             <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <span className="text-white text-4xl">✓</span>
                             </div>
-                            <h2 className="text-2xl font-bold mb-4">Notice Updated Successfully</h2>
+                            <h2 className="text-2xl text-black font-bold mb-4">Notice Updated Successfully</h2>
                             <p className="text-gray-600 mb-6">
                                 Your notice "{formData.noticeTitle}" has been updated successfully.
                             </p>
@@ -652,7 +654,7 @@ const EditNotice = () => {
                                 </button>
                                 <button
                                     onClick={handleCloseModal}
-                                    className="btn btn-outline"
+                                    className="btn bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-300 shadow-sm btn-outline"
                                 >
                                     Close
                                 </button>
