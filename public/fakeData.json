@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "title": "Office closed on Friday for maintenance.",
+    "noticeType": "General / Company-W",
+    "department": "All Department",
+    "departmentColor": "blue",
+    "publishedOn": "2025-06-15",
+    "status": "Published",
+    "isPublished": true
+  },
+  {
+    "id": 2,
+    "title": "Eid al-Fitr holiday schedule.",
+    "noticeType": "Holiday & Event",
+    "department": "Finance",
+    "departmentColor": "blue",
+    "publishedOn": "2025-06-15",
+    "status": "Published",
+    "isPublished": true
+  },
+  {
+    "id": 3,
+    "title": "Updated code of conduct policy",
+    "noticeType": "HR & Policy Update",
+    "department": "Sales Team",
+    "departmentColor": "orange",
+    "publishedOn": "2025-06-15",
+    "status": "Published",
+    "isPublished": true
+  },
+  {
+    "id": 4,
+    "title": "Payroll for October will be processed on 28th",
+    "noticeType": "Finance & Payroll",
+    "department": "Web Team",
+    "departmentColor": "blue",
+    "publishedOn": "2025-06-15",
+    "status": "Published",
+    "isPublished": true
+  },
+  {
+    "id": 5,
+    "title": "System update scheduled for 30 Oct (9:00-11:00 PM)",
+    "noticeType": "IT / System Maintena",
+    "department": "Database Team",
+    "departmentColor": "blue",
+    "publishedOn": "2025-06-15",
+    "status": "Published",
+    "isPublished": true
+  },
+  {
+    "id": 6,
+    "title": "Design team sprint review moved to Tuesday.",
+    "noticeType": "Department / Team",
+    "department": "Admin",
+    "departmentColor": "blue",
+    "publishedOn": "2025-06-15",
+    "status": "Published",
+    "isPublished": true
+  },
+  {
+    "id": 7,
+    "title": "Unauthorized absence recorded on 18 Oct 2025",
+    "noticeType": "Warning / Disciplinary",
+    "department": "Individual",
+    "departmentColor": "blue",
+    "publishedOn": "2025-06-15",
+    "status": "Unpublished",
+    "isPublished": false
+  },
+  {
+    "id": 8,
+    "title": "Office closed today due to severe weather",
+    "noticeType": "Emergency / Urgent",
+    "department": "HR",
+    "departmentColor": "red",
+    "publishedOn": "2025-06-15",
+    "status": "Draft",
+    "isPublished": false
+  }
+]

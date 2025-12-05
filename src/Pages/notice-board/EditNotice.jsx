@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useParams, useLocation } from 'react-router';
 
 const API_BASE_URL = 'http://localhost:3000';
 
-const CreateNotice = () => {
+const EditNotice = () => {
     const navigate = useNavigate();
+    const { id } = useParams();
+    const location = useLocation();
     const [showSuccessModal, setShowSuccessModal] = useState(false);
     const [filePreviewUrls, setFilePreviewUrls] = useState({});
     const [formData, setFormData] = useState({
@@ -40,6 +42,67 @@ const CreateNotice = () => {
         'Contract / Role Update',
         'Advisory / Personal Reminder'
     ];
+
+    // Load notice data on component mount
+    useEffect(() => {
+        const loadNoticeData = (notice) => {
+            // Handle departments - convert string to array if needed
+            let departmentsArray = [];
+            if (notice.departments) {
+                if (Array.isArray(notice.departments)) {
+                    departmentsArray = notice.departments;
+                } else if (typeof notice.departments === 'string') {
+                    departmentsArray = notice.departments.split(',').map(d => d.trim()).filter(d => d);
+                }
+            } else if (notice.department && notice.targetType === 'Department') {
+                departmentsArray = notice.department.split(',').map(d => d.trim()).filter(d => d);
+            }
+
+            // Format date for date input (YYYY-MM-DD format)
+            let formattedDate = '';
+            if (notice.publishDate) {
+                formattedDate = notice.publishDate;
+            } else if (notice.publishedOn) {
+                formattedDate = notice.publishedOn;
+            }
+            
+            // If date is in a different format, convert it
+            if (formattedDate && !formattedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                try {
+                    const date = new Date(formattedDate);
+                    formattedDate = date.toISOString().split('T')[0];
+                } catch (err) {
+                    console.error('Error parsing date:', err);
+                    formattedDate = '';
+                }
+            }
+
+            setFormData({
+                targetType: notice.targetType || 'Individual',
+                noticeTitle: notice.noticeTitle || notice.title || '',
+                employeeId: notice.employeeId || '',
+                employeeName: notice.employeeName || '',
+                position: notice.position || '',
+                departments: departmentsArray,
+                noticeType: notice.noticeType || '',
+                publishDate: formattedDate,
+                noticeBody: notice.noticeBody || '',
+                attachments: notice.attachments || []
+            });
+        };
+
+        // Try to get notice from location state first (faster)
+        if (location.state?.notice) {
+            loadNoticeData(location.state.notice);
+        } else {
+            // Fetch from API if not in state
+            fetch(`${API_BASE_URL}/notice/${id}`)
+                .then(res => res.json())
+                .then(data => {
+                    loadNoticeData(data);
+                });
+        }
+    }, [id, location.state]);
 
     const handleInputChange = (field, value) => {
         setFormData(prev => ({
@@ -86,7 +149,9 @@ const CreateNotice = () => {
     };
 
     const isImageFile = (file) => {
-        if (typeof file === 'string') return false;
+        if (typeof file === 'string') {
+            return /\.(jpg|jpeg|png|gif|webp)$/i.test(file);
+        }
         const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
         return imageTypes.includes(file.type) || /\.(jpg|jpeg|png|gif|webp)$/i.test(file.name);
     };
@@ -97,7 +162,10 @@ const CreateNotice = () => {
     };
 
     const getFilePreviewUrl = (file) => {
-        if (typeof file === 'string') return null;
+        if (typeof file === 'string') {
+            // If it's a string (existing file from server), return null or construct URL if needed
+            return null;
+        }
         if (file instanceof File) {
             const key = file.name + file.size;
             return filePreviewUrls[key] || null;
@@ -105,40 +173,37 @@ const CreateNotice = () => {
         return null;
     };
 
+    const getFileUrl = (file) => {
+        // For existing files from server (strings), construct URL
+        if (typeof file === 'string') {
+            // If it's a URL, return as is, otherwise construct from API
+            if (file.startsWith('http://') || file.startsWith('https://')) {
+                return file;
+            }
+            return `${API_BASE_URL}/uploads/${file}`;
+        }
+        // Only create object URL if it's a File or Blob
+        if (file instanceof File || file instanceof Blob) {
+            return URL.createObjectURL(file);
+        }
+        // If it's an object with a url property, use that
+        if (file && typeof file === 'object' && file.url) {
+            return file.url;
+        }
+        // If it's an object with a name but no File/Blob, return null
+        return null;
+    };
+
     const handleSubmit = (e, action) => {
         e.preventDefault();
 
         if (action === 'draft') {
-            // Save as draft
+            // Save as draft - include all fields and preserve ID
             const draftData = {
                 ...formData,
+                id: parseInt(id),
                 status: 'Draft',
                 isPublished: false,
-                id: Date.now()
-            };
-
-            // save this notice data to the database (via server)
-            fetch(`${API_BASE_URL}/notice`, {
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json'
-                },
-                body: JSON.stringify(draftData)
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.insertedId || data.message) {
-                        alert('Draft saved successfully');
-                        navigate('/notice-board');
-                    }
-                });
-        } else if (action === 'publish') {
-            // Publish notice
-            const noticeData = {
-                ...formData,
-                status: 'Published',
-                isPublished: true,
-                id: Date.now(),
                 publishedOn: formData.publishDate || new Date().toISOString().split('T')[0],
                 department: formData.targetType === 'Department' 
                     ? (formData.departments.length > 0 ? formData.departments.join(', ') : 'All Department')
@@ -146,9 +211,42 @@ const CreateNotice = () => {
                 departmentColor: 'blue'
             };
 
-            // save this notice data to the database (via server)
-            fetch(`${API_BASE_URL}/notice`, {
-                method: 'POST',
+            // update notice data to the database (via server)
+            fetch(`${API_BASE_URL}/notice/${id}`, {
+                method: 'PUT',
+                headers: {
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify(draftData)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.message) {
+                        alert('Draft updated successfully');
+                        navigate('/notice-board', { state: { refresh: true } });
+                    }
+                })
+                .catch(err => {
+                    console.error('Error updating draft:', err);
+                    alert('Failed to update draft');
+                });
+        } else if (action === 'publish') {
+            // Publish notice - include all fields and preserve ID
+            const noticeData = {
+                ...formData,
+                id: parseInt(id),
+                status: 'Published',
+                isPublished: true,
+                publishedOn: formData.publishDate || new Date().toISOString().split('T')[0],
+                department: formData.targetType === 'Department' 
+                    ? (formData.departments.length > 0 ? formData.departments.join(', ') : 'All Department')
+                    : 'Individual',
+                departmentColor: 'blue'
+            };
+
+            // update notice data to the database (via server)
+            fetch(`${API_BASE_URL}/notice/${id}`, {
+                method: 'PUT',
                 headers: {
                     'content-type': 'application/json'
                 },
@@ -156,16 +254,27 @@ const CreateNotice = () => {
             })
                 .then(res => res.json())
                 .then(data => {
-                    if (data.insertedId || data.message) {
+                    if (data.message) {
                         setShowSuccessModal(true);
                     }
+                })
+                .catch(err => {
+                    console.error('Error updating notice:', err);
+                    alert('Failed to update notice');
                 });
         }
     };
 
     const handleCloseModal = () => {
         setShowSuccessModal(false);
-        navigate('/notice-board');
+        // Navigate back with refresh flag and restore state
+        const savedState = localStorage.getItem('noticeBoardState');
+        navigate('/notice-board', { 
+            state: { 
+                refresh: true,
+                restoreState: savedState ? JSON.parse(savedState) : null
+            } 
+        });
     };
 
     // Cleanup object URLs to prevent memory leaks
@@ -183,9 +292,9 @@ const CreateNotice = () => {
             <div className="mb-6">
                 <Link to="/notice-board" className="flex items-center gap-2 text-gray-600 hover:text-gray-800 mb-2">
                     <span className="text-xl">←</span>
-                    <span className="text-xl font-bold text-gray-800">Create a Notice</span>
+                    <span className="text-xl font-bold text-gray-800">Edit Notice</span>
                 </Link>
-                <p className="text-gray-600 ml-8">Please fill in the details below</p>
+                <p className="text-gray-600 ml-8">Update the notice details below</p>
             </div>
 
             {/* Form */}
@@ -389,17 +498,26 @@ const CreateNotice = () => {
                                 const isImage = isImageFile(file);
                                 const isPdf = isPdfFile(file);
                                 const previewUrl = getFilePreviewUrl(file);
+                                const fileUrl = getFileUrl(file);
 
                                 return (
                                     <div key={index} className="border border-gray-300 rounded-lg p-4 bg-white">
-                                        {isImage && previewUrl ? (
+                                        {isImage ? (
                                             <div className="space-y-2">
                                                 <div className="relative">
                                                     <img 
-                                                        src={previewUrl} 
+                                                        src={previewUrl || fileUrl || '#'} 
                                                         alt={fileName}
                                                         className="max-w-full h-auto max-h-64 rounded-lg border border-gray-200"
+                                                        onError={(e) => {
+                                                            e.target.style.display = 'none';
+                                                            const errorDiv = e.target.nextSibling;
+                                                            if (errorDiv) errorDiv.style.display = 'block';
+                                                        }}
                                                     />
+                                                    <div style={{ display: 'none' }} className="w-full h-32 bg-gray-100 rounded-lg flex items-center justify-center">
+                                                        <span className="text-gray-500">Image not available</span>
+                                                    </div>
                                                     <button
                                                         type="button"
                                                         onClick={() => removeFile(index)}
@@ -423,9 +541,9 @@ const CreateNotice = () => {
                                                         <p className="text-sm font-medium text-gray-800 truncate">{fileName}</p>
                                                         <p className="text-xs text-gray-500">PDF Document</p>
                                                     </div>
-                                                    {previewUrl && (
+                                                    {(previewUrl || fileUrl) && (
                                                         <a
-                                                            href={previewUrl}
+                                                            href={previewUrl || fileUrl}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="btn btn-sm bg-blue-500 hover:bg-blue-600 text-white"
@@ -457,9 +575,9 @@ const CreateNotice = () => {
                                                         <p className="text-xs text-gray-500">File Attachment</p>
                                                     </div>
                                                 </div>
-                                                {previewUrl && (
+                                                {(previewUrl || fileUrl) && (
                                                     <a
-                                                        href={previewUrl}
+                                                        href={previewUrl || fileUrl}
                                                         download={fileName}
                                                         className="btn btn-sm bg-green-500 hover:bg-green-600 text-white"
                                                         title="Download file"
@@ -500,7 +618,7 @@ const CreateNotice = () => {
                         type="submit"
                         className="btn bg-orange-500 hover:bg-orange-600 text-white border-0 shadow-md"
                     >
-                        <span className="mr-2">✓</span> Publish Notice
+                        <span className="mr-2">✓</span> Update Notice
                     </button>
                 </div>
             </form>
@@ -513,36 +631,24 @@ const CreateNotice = () => {
                             <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <span className="text-white text-4xl">✓</span>
                             </div>
-                            <h2 className="text-2xl font-bold mb-4">Notice Published Successfully</h2>
+                            <h2 className="text-2xl font-bold mb-4">Notice Updated Successfully</h2>
                             <p className="text-gray-600 mb-6">
-                                Your notice "{formData.noticeTitle || 'Holiday Schedule - November 2025'}" has been published and is now visible to all selected departments.
+                                Your notice "{formData.noticeTitle}" has been updated successfully.
                             </p>
                             <div className="flex gap-4 justify-center">
                                 <button
-                                    onClick={() => navigate('/notice-board')}
+                                    onClick={() => {
+                                        const savedState = localStorage.getItem('noticeBoardState');
+                                        navigate('/notice-board', { 
+                                            state: { 
+                                                refresh: true,
+                                                restoreState: savedState ? JSON.parse(savedState) : null
+                                            } 
+                                        });
+                                    }}
                                     className="btn btn-outline btn-primary"
                                 >
                                     View Notice
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowSuccessModal(false);
-                                        setFormData({
-                                            targetType: 'Individual',
-                                            noticeTitle: '',
-                                            employeeId: '',
-                                            employeeName: '',
-                                            position: '',
-                                            departments: [],
-                                            noticeType: '',
-                                            publishDate: '',
-                                            noticeBody: '',
-                                            attachments: []
-                                        });
-                                    }}
-                                    className="btn btn-outline btn-warning"
-                                >
-                                    + Create Another
                                 </button>
                                 <button
                                     onClick={handleCloseModal}
@@ -559,5 +665,5 @@ const CreateNotice = () => {
     );
 };
 
-export default CreateNotice;
+export default EditNotice;
 
