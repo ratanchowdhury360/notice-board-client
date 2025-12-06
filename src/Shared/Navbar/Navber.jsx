@@ -36,7 +36,7 @@ export const Navber = ({ sidebarOpen, setSidebarOpen }) => {
                 <div className="flex items-center gap-2 sm:gap-6">
                     {/* Greeting and Date - Hidden on small mobile */}
                     <div className="hidden sm:block text-right">
-                        <p className="text-xs sm:text-sm font-medium">{greeting} Asif</p>
+                        <p className="text-xs sm:text-sm font-medium">{greeting} Ratan</p>
                         <p className="text-xs text-blue-200">{currentDate}</p>
                     </div>
 
@@ -49,7 +49,7 @@ export const Navber = ({ sidebarOpen, setSidebarOpen }) => {
                     <div className="flex items-center gap-2 sm:gap-3">
                         {/* User Info - Hidden on small mobile */}
                         <div className="hidden sm:block text-right">
-                            <p className="text-xs sm:text-sm font-semibold">Asif Riaj</p>
+                            <p className="text-xs sm:text-sm font-semibold">Md. Ratan Chowdhury</p>
                             <p className="text-xs text-blue-200">Hr</p>
                         </div>
 

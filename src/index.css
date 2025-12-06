@@ -48,3 +48,17 @@ select option:first-child {
     color: #9ca3af; /* gray-400 for placeholder option */
 }
 
+/* Custom date input icon styling */
+input[type="date"].custom-date::-webkit-calendar-picker-indicator {
+    filter: invert(0.3) brightness(0.8);
+    cursor: pointer;
+}
+
+input[type="date"].custom-date::-webkit-calendar-picker-indicator:hover {
+    filter: invert(0.2) brightness(1);
+}
+
+/* Firefox date input icon */
+input[type="date"].custom-date {
+    color-scheme: light;
+}

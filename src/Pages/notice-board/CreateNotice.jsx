@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import Swal from 'sweetalert2';
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://notice-board-server-rho.vercel.app';
 
 const CreateNotice = () => {
     const navigate = useNavigate();
@@ -164,7 +164,12 @@ const CreateNotice = () => {
                 },
                 body: JSON.stringify(draftData)
             })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     if (data.insertedId || data.message) {
                         Swal.fire({
@@ -185,7 +190,9 @@ const CreateNotice = () => {
                         });
                     }
                 })
-                .catch(() => {
+                .catch((err) => {
+                    console.error('Error saving draft:', err);
+                    console.error('API URL:', API_BASE_URL);
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
@@ -208,7 +215,7 @@ const CreateNotice = () => {
                 id: Date.now(),
                 publishedOn: formData.publishDate || new Date().toISOString().split('T')[0],
                 lastUpdated: new Date().toISOString(),
-                department: formData.targetType === 'Department' 
+                department: formData.targetType === 'Department'
                     ? (formData.departments.length > 0 ? formData.departments.join(', ') : 'All Department')
                     : 'Individual',
                 departmentColor: 'blue'
@@ -222,7 +229,12 @@ const CreateNotice = () => {
                 },
                 body: JSON.stringify(noticeData)
             })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     if (data.insertedId || data.message) {
                         Swal.fire({
@@ -284,7 +296,9 @@ const CreateNotice = () => {
                         });
                     }
                 })
-                .catch(() => {
+                .catch((err) => {
+                    console.error('Error publishing notice:', err);
+                    console.error('API URL:', API_BASE_URL);
                     Swal.fire({
                         icon: 'error',
                         title: 'Publication Failed',
@@ -330,9 +344,8 @@ const CreateNotice = () => {
                         <span className="label-text text-gray-800 font-semibold">Target Department(s) or Individual <span className="text-red-500">*</span></span>
                     </label>
                     <select
-                        className={`select select-bordered w-full text-gray-800 border-gray-300 focus:border-blue-500 ${
-                            formData.targetType === 'Individual' ? 'bg-blue-50' : 'bg-white'
-                        }`}
+                        className={`select select-bordered w-full text-gray-800 border-gray-300 focus:border-blue-500 ${formData.targetType === 'Individual' ? 'bg-blue-50' : 'bg-white'
+                            }`}
                         value={formData.targetType}
                         onChange={(e) => handleInputChange('targetType', e.target.value)}
                         required
@@ -498,11 +511,12 @@ const CreateNotice = () => {
                         </label>
                         <input
                             type="date"
-                            className="input input-bordered w-full text-gray-800 bg-white border-gray-300 focus:border-blue-500"
+                            className="input input-bordered w-full text-gray-800 bg-blue-50 border-gray-300 focus:border-blue-500 custom-date"
                             placeholder="Select Publishing Date (optional)"
                             value={formData.publishDate}
                             onChange={(e) => handleInputChange('publishDate', e.target.value)}
                         />
+
                     </div>
                 </div>
 
@@ -553,8 +567,8 @@ const CreateNotice = () => {
                                             <div className="space-y-2">
                                                 <div className="relative">
                                                     {previewUrl ? (
-                                                        <img 
-                                                            src={previewUrl} 
+                                                        <img
+                                                            src={previewUrl}
                                                             alt={fileName}
                                                             className="max-w-full h-auto max-h-64 rounded-lg border border-gray-200"
                                                             onError={(e) => {

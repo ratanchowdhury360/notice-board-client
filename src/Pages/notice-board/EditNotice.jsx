@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router';
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://notice-board-server-rho.vercel.app';
 
 const EditNotice = () => {
     const navigate = useNavigate();
@@ -97,9 +97,18 @@ const EditNotice = () => {
         } else {
             // Fetch from API if not in state
             fetch(`${API_BASE_URL}/notice/${id}`)
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     loadNoticeData(data);
+                })
+                .catch(err => {
+                    console.error('Error fetching notice:', err);
+                    console.error('API URL:', API_BASE_URL);
                 });
         }
     }, [id, location.state]);
@@ -220,7 +229,12 @@ const EditNotice = () => {
                 },
                 body: JSON.stringify(draftData)
             })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     if (data.message) {
                         alert('Draft updated successfully');
@@ -229,6 +243,7 @@ const EditNotice = () => {
                 })
                 .catch(err => {
                     console.error('Error updating draft:', err);
+                    console.error('API URL:', API_BASE_URL);
                     alert('Failed to update draft');
                 });
         } else if (action === 'publish') {
@@ -254,7 +269,12 @@ const EditNotice = () => {
                 },
                 body: JSON.stringify(noticeData)
             })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
                 .then(data => {
                     if (data.message) {
                         setShowSuccessModal(true);
@@ -262,6 +282,7 @@ const EditNotice = () => {
                 })
                 .catch(err => {
                     console.error('Error updating notice:', err);
+                    console.error('API URL:', API_BASE_URL);
                     alert('Failed to update notice');
                 });
         }
@@ -451,7 +472,7 @@ const EditNotice = () => {
                         </label>
                         <input
                             type="date"
-                            className="input input-bordered w-full text-gray-800 bg-white border-gray-300 focus:border-blue-500"
+                            className="input input-bordered w-full text-gray-800 bg-blue-50 border-gray-300 focus:border-blue-500 custom-date"
                             placeholder="Select Publishing Date"
                             value={formData.publishDate}
                             onChange={(e) => handleInputChange('publishDate', e.target.value)}

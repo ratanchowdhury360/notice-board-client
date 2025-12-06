@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router';
 import Swal from 'sweetalert2';
 
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://notice-board-server-rho.vercel.app';
 
 const NoticeBoard = () => {
     const navigate = useNavigate();
@@ -29,8 +29,18 @@ const NoticeBoard = () => {
 
     // Fetch notices from backend
     const fetchNotices = () => {
-        fetch(`${API_BASE_URL}/notice`)
-            .then(res => res.json())
+        fetch(`${API_BASE_URL}/notice`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                return res.json();
+            })
             .then(data => {
                 // Sort notices by date/time - most recent first
                 const sortedNotices = data.sort((a, b) => {
@@ -39,6 +49,11 @@ const NoticeBoard = () => {
                     return dateB - dateA; // Most recent first
                 });
                 setNotices(sortedNotices);
+            })
+            .catch(err => {
+                console.error('Error fetching notices:', err);
+                console.error('API URL:', API_BASE_URL);
+                setNotices([]);
             });
     };
 
@@ -230,7 +245,12 @@ const NoticeBoard = () => {
             },
             body: JSON.stringify(updatedNotice)
         })
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                return res.json();
+            })
             .then(data => {
                 if (data.message || data.modifiedCount || data.acknowledged) {
                     // Refresh notices from server to get updated data
@@ -241,6 +261,7 @@ const NoticeBoard = () => {
             })
             .catch(err => {
                 console.error('Error updating notice:', err);
+                console.error('API URL:', API_BASE_URL);
             });
     };
 
@@ -326,7 +347,12 @@ const NoticeBoard = () => {
                 fetch(`${API_BASE_URL}/notice/${noticeId}`, {
                     method: 'DELETE'
                 })
-                    .then(res => res.json())
+                    .then(res => {
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        return res.json();
+                    })
                     .then(data => {
                         if (data.message || data.deletedCount) {
                             // Refresh notices from server to get updated data
@@ -338,6 +364,15 @@ const NoticeBoard = () => {
                                 icon: "success"
                             });
                         }
+                    })
+                    .catch(err => {
+                        console.error('Error deleting notice:', err);
+                        console.error('API URL:', API_BASE_URL);
+                        Swal.fire({
+                            title: "Error!",
+                            text: "Failed to delete notice.",
+                            icon: "error"
+                        });
                     });
             }
         });
